@@ -10,6 +10,11 @@
 #ifndef __CPUFREQ_DT_H__
 #define __CPUFREQ_DT_H__
 
+struct cpufreq_cpu_domain {
+	struct list_head node;
+	cpumask_t cpus;
+};
+
 struct cpufreq_dt_platform_data {
 	/*
 	 * True when each CPU has its own clock to control its
@@ -17,6 +22,7 @@ struct cpufreq_dt_platform_data {
 	 * clock.
 	 */
 	bool independent_clocks;
+	struct list_head domain_list;
 };
 
 #endif /* __CPUFREQ_DT_H__ */

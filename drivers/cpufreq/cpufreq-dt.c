@@ -359,6 +359,24 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 
 	policy->cpuinfo.transition_latency = transition_latency;
 
+	pd = cpufreq_get_driver_data();
+	if (!pd || !pd->independent_clocks)
+		cpumask_setall(policy->cpus);
+	else if (pd && !list_empty(&pd->domain_list)) {
+		struct list_head *domain_node;
+		struct cpufreq_cpu_domain *domain;
+
+		list_for_each(domain_node, &pd->domain_list) {
+			domain = container_of(domain_node,
+					      struct cpufreq_cpu_domain, node);
+			if (!cpumask_test_cpu(policy->cpu, &domain->cpus))
+				continue;
+
+			cpumask_copy(policy->cpus, &domain->cpus);
+			break;
+		}
+	}
+
 	of_node_put(np);
 
 	return 0;

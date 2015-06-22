@@ -4217,6 +4217,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
+	unsigned long utilization, capacity;
 
 	for_each_sched_entity(se) {
 		if (se->on_rq)
@@ -4252,6 +4253,19 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		update_rq_runnable_avg(rq, rq->nr_running);
 		add_nr_running(rq, 1);
 	}
+
+#ifdef CONFIG_CPU_FREQ_GOV_SCHED
+	/* add 25% margin to current utilization */
+	utilization = rq->cfs.utilization_load_avg;
+	capacity = utilization + (utilization >> 2);
+
+	/* handle rounding errors */
+	capacity = (capacity > SCHED_LOAD_SCALE) ? SCHED_LOAD_SCALE :
+		capacity;
+
+	cpufreq_sched_set_cap(cpu_of(rq), capacity);
+#endif
+
 	hrtick_update(rq);
 }
 
@@ -4267,6 +4281,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
+	unsigned long utilization, capacity;
 
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
@@ -4313,6 +4328,19 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		sub_nr_running(rq, 1);
 		update_rq_runnable_avg(rq, 1);
 	}
+
+#ifdef CONFIG_CPU_FREQ_GOV_SCHED
+	/* add 25% margin to current utilization */
+	utilization = rq->cfs.utilization_load_avg;
+	capacity = utilization + (utilization >> 2);
+
+	/* handle rounding errors */
+	capacity = (capacity > SCHED_LOAD_SCALE) ? SCHED_LOAD_SCALE :
+		capacity;
+
+	cpufreq_sched_set_cap(cpu_of(rq), capacity);
+#endif
+
 	hrtick_update(rq);
 }
 
@@ -7806,6 +7834,7 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &curr->se;
+	unsigned long utilization, capacity;
 
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
@@ -7816,6 +7845,18 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 		task_tick_numa(rq, curr);
 
 	update_rq_runnable_avg(rq, 1);
+
+#ifdef CONFIG_CPU_FREQ_GOV_SCHED
+	/* add 25% margin to current utilization */
+	utilization = rq->cfs.utilization_load_avg;
+	capacity = utilization + (utilization >> 2);
+
+	/* handle rounding errors */
+	capacity = (capacity > SCHED_LOAD_SCALE) ? SCHED_LOAD_SCALE :
+		capacity;
+
+	cpufreq_sched_set_cap(cpu_of(rq), capacity);
+#endif
 }
 
 /*

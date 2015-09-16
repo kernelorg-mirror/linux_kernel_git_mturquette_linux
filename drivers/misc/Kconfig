@@ -525,6 +525,17 @@ config VEXPRESS_SYSCFG
 	  bus. System Configuration interface is one of the possible means
 	  of generating transactions on this bus.
 
+config IDLEFORCE
+	bool "Cyclic Idle Injection driver"
+	help
+	  Enable this to enable the cyclic idle injection driver.
+
+config IDLEFORCE_RR
+	bool "Round Robin Idle Injection driver"
+	depends on !IDLEFORCE
+	help
+	  Enable this to enable the Round Robin idle injection driver.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

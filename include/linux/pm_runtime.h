@@ -42,6 +42,8 @@ extern int __pm_runtime_resume(struct device *dev, int rpmflags);
 extern int pm_schedule_suspend(struct device *dev, unsigned int delay);
 extern int __pm_runtime_set_status(struct device *dev, unsigned int status);
 extern int pm_runtime_barrier(struct device *dev);
+extern int pm_runtime_pstate_set(struct device *dev, unsigned int state);
+extern void pm_runtime_scale_allow(struct device *dev);
 extern void pm_runtime_enable(struct device *dev);
 extern void __pm_runtime_disable(struct device *dev, bool check_resume);
 extern void pm_runtime_allow(struct device *dev);
@@ -85,6 +87,11 @@ static inline bool pm_runtime_suspended(struct device *dev)
 {
 	return dev->power.runtime_status == RPM_SUSPENDED
 		&& !dev->power.disable_depth;
+}
+
+static inline bool pm_runtime_scaling_allowed(struct device *dev)
+{
+		return dev->power.scale_allowed;
 }
 
 static inline bool pm_runtime_active(struct device *dev)
@@ -150,6 +157,7 @@ static inline int pm_schedule_suspend(struct device *dev, unsigned int delay)
 }
 static inline int __pm_runtime_set_status(struct device *dev,
 					    unsigned int status) { return 0; }
+extern int pm_runtime_pstate_set(struct device *dev, unsigned int state);
 static inline int pm_runtime_barrier(struct device *dev) { return 0; }
 static inline void pm_runtime_enable(struct device *dev) {}
 static inline void __pm_runtime_disable(struct device *dev, bool c) {}

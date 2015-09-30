@@ -15,6 +15,7 @@
 #include "power.h"
 
 typedef int (*pm_callback_t)(struct device *);
+typedef int (*pm_callback2_t)(struct device *, unsigned int);
 
 static pm_callback_t __rpm_get_callback(struct device *dev, size_t cb_offset)
 {
@@ -1239,6 +1240,22 @@ void pm_runtime_allow(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(pm_runtime_allow);
 
+void pm_runtime_scale_forbid(struct device *dev)
+{
+	spin_lock_irq(&dev->power.lock);
+	dev->power.scale_allowed = false;
+	spin_unlock_irq(&dev->power.lock);
+}
+EXPORT_SYMBOL_GPL(pm_runtime_scale_forbid);
+
+void pm_runtime_scale_allow(struct device *dev)
+{
+	spin_lock_irq(&dev->power.lock);
+	dev->power.scale_allowed = true;
+	spin_unlock_irq(&dev->power.lock);
+}
+EXPORT_SYMBOL_GPL(pm_runtime_scale_allow);
+
 /**
  * pm_runtime_no_callbacks - Ignore runtime PM callbacks for a device.
  * @dev: Device to handle.
@@ -1357,7 +1374,21 @@ void __pm_runtime_use_autosuspend(struct device *dev, bool use)
 	spin_unlock_irq(&dev->power.lock);
 }
 EXPORT_SYMBOL_GPL(__pm_runtime_use_autosuspend);
+int pm_runtime_pstate_set(struct device *dev,
+			unsigned int state)
+{
+	pm_callback2_t callback;
+	unsigned int retval;
 
+	spin_lock_irq(&dev->power.lock);
+	callback = (pm_callback2_t)RPM_GET_CALLBACK(dev, pstate_set);
+
+	if (callback)
+		retval = callback(dev, state);
+
+	spin_unlock_irq(&dev->power.lock);
+	return retval;
+}
 /**
  * pm_runtime_init - Initialize runtime PM fields in given device object.
  * @dev: Device object to initialize.

@@ -24,6 +24,7 @@
 
 struct arm_pm_domain {
 	struct generic_pm_domain genpd;
+	struct generic_perf_domain perfd;
 	struct of_arm_pd_ops platform_ops;
 };
 
@@ -147,6 +148,20 @@ static int __init arm_domain_cpu_init(void)
 	return 0;
 }
 
+
+int arm_pd_get_next_state(struct generic_pm_domain *genpd,
+				unsigned int *next_state)
+{
+	return 0;
+}
+
+int arm_pd_set_state(struct generic_pm_domain *genpd,
+				unsigned int state)
+{
+
+	return 0;
+}
+
 static int __init arm_domain_init(void)
 {
 	struct device_node *np;
@@ -186,10 +201,16 @@ static int __init arm_domain_init(void)
 		pd->genpd.power_off = arm_pd_power_down;
 		pd->genpd.power_on = arm_pd_power_up;
 		pd->genpd.flags |= GENPD_FLAG_IRQ_SAFE;
+		pd->genpd.get_next_state = arm_pd_get_next_state;
+		pd->genpd.set_state = arm_pd_set_state;
+		pd->perfd.name = kstrndup("cpux", 10, GFP_KERNEL);
 
 		pr_debug("adding %s as generic power domain.\n", np->full_name);
 		pm_genpd_init(&pd->genpd, &simple_qos_governor, false);
 		of_genpd_add_provider_simple(np, &pd->genpd);
+		perf_domain_init(&pd->perfd, NULL);
+		perfd_add_genpd(&pd->perfd, &pd->genpd,
+			PERFD_FLAGS_GENPD_IS_ROOT);
 
 		count++;
 	}

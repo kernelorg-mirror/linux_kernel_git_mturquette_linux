@@ -108,6 +108,8 @@
 		compatible = "gpio-leds";
 		led6 {
 			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			power-domains = <&cpu0_pd>;
 		};
 		led7 {
 			gpios = <&gpio4 23 GPIO_ACTIVE_HIGH>;

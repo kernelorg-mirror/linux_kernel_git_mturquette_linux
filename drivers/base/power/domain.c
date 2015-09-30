@@ -168,7 +168,7 @@ struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
  * This should only be used where we are certain that the pm_domain
  * attached to the device is a genpd domain.
  */
-static struct generic_pm_domain *dev_to_genpd(struct device *dev)
+struct generic_pm_domain *dev_to_genpd(struct device *dev)
 {
 	if (IS_ERR_OR_NULL(dev->pm_domain))
 		return ERR_PTR(-EINVAL);
@@ -1305,6 +1305,8 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
 	gpd_data->td.constraint_changed = true;
 	gpd_data->td.effective_constraint_ns = -1;
 	gpd_data->nb.notifier_call = genpd_dev_pm_qos_notifier;
+	/* TODO: should be passed as an argument */
+	gpd_data->sd.pstate = 0;
 
 	spin_lock_irq(&dev->power.lock);
 
@@ -2195,7 +2197,10 @@ static int pm_genpd_summary_one(struct seq_file *s,
 
 	if (WARN_ON(genpd->status >= ARRAY_SIZE(status_lookup)))
 		goto exit;
-	seq_printf(s, "%-30s  %-15s  ", genpd->name, status_lookup[genpd->status]);
+
+	seq_printf(s, "%-30s  %-15s  perf %-3d %d",
+		genpd->name, status_lookup[genpd->status],
+		genpd->state, genpd->next_state);
 
 	/*
 	 * Modifications on the list require holding locks on both

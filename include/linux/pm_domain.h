@@ -21,6 +21,7 @@
 /* Defines used for the flags field in the struct generic_pm_domain */
 #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
 #define GENPD_FLAG_IRQ_SAFE	(1U << 1) /* PM domain operates in atomic */
+#define PERFD_FLAGS_GENPD_IS_ROOT (1 << 0)
 
 enum gpd_status {
 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
@@ -43,6 +44,33 @@ struct gpd_dev_ops {
 struct gpd_cpuidle_data {
 	unsigned int saved_exit_latency;
 	struct cpuidle_state *idle_state;
+};
+
+struct gpd_scale_data {
+	unsigned int pstate;
+	unsigned int requested_pstate;
+};
+
+struct generic_perf_domain {
+	const char *name;
+	struct list_head node;
+	struct list_head power_domain_list;
+	struct generic_pm_domain *root;
+	struct generic_scale_governor *gov;
+
+	union {
+		struct mutex mlock;
+		struct {
+			spinlock_t slock;
+			unsigned long lock_flags;
+		};
+	};
+	unsigned int flags;	/* Bit field of configs for genpd */
+	bool irq_safe;
+};
+
+struct generic_scale_governor {
+	int (*update)(struct generic_perf_domain *perfd);
 };
 
 struct generic_pm_domain {
@@ -83,6 +111,19 @@ struct generic_pm_domain {
 			unsigned long lock_flags;
 		};
 	};
+
+	int (*set_state)(struct generic_pm_domain *domain,
+		unsigned int state);
+	int (*get_next_state)(struct generic_pm_domain *domain,
+		unsigned int *next_state);
+
+	struct list_head perfd_node;
+	struct generic_perf_domain *perfd;
+
+	unsigned int old_state;
+	unsigned int state;
+	unsigned int next_state;
+	bool pending_update;
 };
 
 static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
@@ -116,6 +157,7 @@ struct generic_pm_domain_data {
 	struct pm_domain_data base;
 	struct gpd_timing_data td;
 	struct notifier_block nb;
+	struct gpd_scale_data sd;
 };
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
@@ -159,6 +201,17 @@ extern void pm_genpd_poweroff_unused(void);
 
 extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
+extern struct generic_scale_governor scale_gov_ladder;
+extern struct generic_scale_governor scale_gov_simple;
+
+extern int perfd_add_genpd(struct generic_perf_domain *perfd,
+			struct generic_pm_domain *genpd,
+			unsigned int flags);
+extern int perf_domain_init(struct generic_perf_domain *perfd,
+			struct generic_scale_governor *gov);
+struct generic_pm_domain *dev_to_genpd(struct device *dev);
+int perfd_dev_set_pstate_default(struct device *dev, unsigned int state);
+
 #else
 
 static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
@@ -232,6 +285,9 @@ static inline int pm_genpd_name_poweron(const char *domain_name)
 static inline void pm_genpd_poweroff_unused(void) {}
 #define simple_qos_governor NULL
 #define pm_domain_always_on_gov NULL
+#define scale_gov_ladder NULL
+#define scale_gov_simple NULL
+
 #endif
 
 static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,

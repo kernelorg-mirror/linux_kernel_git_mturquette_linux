@@ -28,6 +28,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/thermal.h>
+#include <linux/pm_runtime.h>
 
 struct private_data {
 	struct device *cpu_dev;
@@ -48,6 +49,8 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
 	unsigned int old_freq, new_freq;
 	long freq_Hz, freq_exact;
 	int ret;
+
+	ret = pm_runtime_pstate_set(cpu_dev, index);
 
 	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
 	if (freq_Hz <= 0)
@@ -126,6 +129,8 @@ static int allocate_resources(int cpu, struct device **cdev,
 		pr_err("failed to get cpu%d device\n", cpu);
 		return -ENODEV;
 	}
+
+	pm_runtime_scale_allow(cpu_dev);
 
 	/* Try "cpu0" for older DTs */
 	if (!cpu)

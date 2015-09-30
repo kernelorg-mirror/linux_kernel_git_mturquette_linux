@@ -354,6 +354,56 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
 
 /**
+ * dev_pm_opp_find_freq_ceil() - Search for an rounded ceil freq
+ * @dev:	device for which we do this operation
+ * @index:	OPP table index
+ *
+ * return a opp pointer form index
+ *
+ * Return: matching *opp, else returns
+ * ERR_PTR in case of error and should be handled using IS_ERR. Error return
+ * values can be:
+ * EINVAL:	for bad pointer
+ * ERANGE:	no match found for search
+ * ENODEV:	if device not found in list of registered devices
+ *
+ * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+ * protected pointer. The reason for the same is that the opp pointer which is
+ * returned will remain valid for use with opp_get_{voltage, freq} only while
+ * under the locked area. The pointer returned must be used prior to unlocking
+ * with rcu_read_unlock() to maintain the integrity of the pointer.
+ */
+struct dev_pm_opp *dev_pm_opp_get_opp(struct device *dev,
+					     unsigned int index)
+{
+	struct device_opp *dev_opp;
+	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+	int i = 0;
+
+	opp_rcu_lockdep_assert();
+
+	if (!dev) {
+		dev_err(dev, "%s: Invalid argument.\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
+	dev_opp = _find_device_opp(dev);
+	if (IS_ERR(dev_opp))
+		return ERR_CAST(dev_opp);
+
+	list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
+		if (i == index) {
+			opp = temp_opp;
+			break;
+		}
+		i++;
+	}
+
+	return opp;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_get_opp);
+
+/**
  * dev_pm_opp_find_freq_floor() - Search for a rounded floor freq
  * @dev:	device for which we do this operation
  * @freq:	Start frequency

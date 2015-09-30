@@ -42,6 +42,9 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
 struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
 					     unsigned long *freq);
 
+struct dev_pm_opp *dev_pm_opp_get_opp(struct device *dev,
+					     unsigned int index);
+
 int dev_pm_opp_add(struct device *dev, unsigned long freq,
 		   unsigned long u_volt);
 void dev_pm_opp_remove(struct device *dev, unsigned long freq);
@@ -51,6 +54,11 @@ int dev_pm_opp_enable(struct device *dev, unsigned long freq);
 int dev_pm_opp_disable(struct device *dev, unsigned long freq);
 
 struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev);
+
+int opp_scale_register(struct device *dev, char *reg_name,
+				char *clk_name);
+int opp_scale(struct device *dev, unsigned int index);
+
 #else
 static inline unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
 {
@@ -81,6 +89,12 @@ static inline struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
 
 static inline struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
 					unsigned long *freq)
+{
+	return ERR_PTR(-EINVAL);
+}
+
+static inline struct dev_pm_opp *dev_pm_opp_get_opp(struct device *dev,
+					unsigned int index)
 {
 	return ERR_PTR(-EINVAL);
 }

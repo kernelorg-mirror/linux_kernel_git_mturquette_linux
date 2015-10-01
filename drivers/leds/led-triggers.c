@@ -107,6 +107,15 @@ ssize_t led_trigger_show(struct device *dev, struct device_attribute *attr,
 }
 EXPORT_SYMBOL_GPL(led_trigger_show);
 
+int led_trigger_scale(struct led_classdev *led_cdev, unsigned int state)
+{
+	if (led_cdev->trigger->scale)
+		led_cdev->trigger->scale(led_cdev, state);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(led_trigger_scale);
+
 /* Caller must ensure led_cdev->trigger_lock held */
 void led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 {

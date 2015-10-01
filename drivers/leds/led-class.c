@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/timer.h>
+#include <linux/pm_domain.h>
 #include "leds.h"
 
 static struct class *leds_class;
@@ -214,7 +215,24 @@ static int led_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(leds_class_dev_pm_ops, led_suspend, led_resume);
+int led_scale(struct device *dev, unsigned int state)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+#ifdef CONFIG_LEDS_TRIGGERS
+	down_write(&led_cdev->trigger_lock);
+	if (led_cdev->trigger)
+		led_trigger_scale(led_cdev, state);
+	up_write(&led_cdev->trigger_lock);
+#endif
+
+	return 0;
+}
+
+const struct dev_pm_ops leds_class_dev_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(led_suspend, led_resume)
+	.pstate_set = led_scale,
+};
 
 static int match_name(struct device *dev, const void *data)
 {

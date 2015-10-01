@@ -20,6 +20,7 @@
 #include <linux/leds.h>
 #include <linux/reboot.h>
 #include "../leds.h"
+#include <linux/pm_runtime.h>
 
 static int panic_heartbeats;
 
@@ -29,12 +30,55 @@ struct heartbeat_trig_data {
 	struct timer_list timer;
 };
 
+static int set_state(struct led_classdev *led_cdev, unsigned int next_state)
+{
+	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+
+	switch (next_state) {
+	case 0:
+		heartbeat_data->period  = 1260;
+		break;
+	case 1:
+		 heartbeat_data->period = 860;
+		break;
+	case 2:
+		 heartbeat_data->period = 510;
+		break;
+
+	default:
+		 heartbeat_data->period = 300;
+		 break;
+
+	}
+
+	heartbeat_data->period  = msecs_to_jiffies(heartbeat_data->period);
+
+	return 0;
+}
+
+static int led_get_pstate(void)
+{
+	unsigned int n;
+
+	n = 300 + (6720 << FSHIFT) / (5 * avenrun[0] + (7 << FSHIFT));
+
+	if (n >= 1200)
+		return 0;
+	if (n >= 800)
+		return 1;
+	if (n >= 500)
+		return 2;
+
+	return 3;
+}
+
 static void led_heartbeat_function(unsigned long data)
 {
 	struct led_classdev *led_cdev = (struct led_classdev *) data;
 	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
 	unsigned long brightness = LED_OFF;
 	unsigned long delay = 0;
+	unsigned int pstate = 0;
 
 	if (unlikely(panic_heartbeats)) {
 		led_set_brightness(led_cdev, LED_OFF);
@@ -44,16 +88,9 @@ static void led_heartbeat_function(unsigned long data)
 	/* acts like an actual heart beat -- ie thump-thump-pause... */
 	switch (heartbeat_data->phase) {
 	case 0:
-		/*
-		 * The hyperbolic function below modifies the
-		 * heartbeat period length in dependency of the
-		 * current (1min) load. It goes through the points
-		 * f(0)=1260, f(1)=860, f(5)=510, f(inf)->300.
-		 */
-		heartbeat_data->period = 300 +
-			(6720 << FSHIFT) / (5 * avenrun[0] + (7 << FSHIFT));
-		heartbeat_data->period =
-			msecs_to_jiffies(heartbeat_data->period);
+		pstate = led_get_pstate();
+		pm_runtime_pstate_set(led_cdev->dev, pstate);
+
 		delay = msecs_to_jiffies(70);
 		heartbeat_data->phase++;
 		brightness = led_cdev->max_brightness;
@@ -109,6 +146,7 @@ static struct led_trigger heartbeat_led_trigger = {
 	.name     = "heartbeat",
 	.activate = heartbeat_trig_activate,
 	.deactivate = heartbeat_trig_deactivate,
+	.scale = set_state,
 };
 
 static int heartbeat_reboot_notifier(struct notifier_block *nb,

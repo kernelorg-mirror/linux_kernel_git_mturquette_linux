@@ -214,6 +214,8 @@ struct led_trigger {
 	const char	 *name;
 	void		(*activate)(struct led_classdev *led_cdev);
 	void		(*deactivate)(struct led_classdev *led_cdev);
+	int		(*scale)(struct led_classdev *led_cdev,
+					unsigned int state);
 
 	/* LEDs under control by this trigger (for simple triggers) */
 	rwlock_t	  leddev_list_lock;
@@ -247,6 +249,7 @@ extern void led_trigger_blink_oneshot(struct led_trigger *trigger,
 extern void led_trigger_set_default(struct led_classdev *led_cdev);
 extern void led_trigger_set(struct led_classdev *led_cdev,
 			struct led_trigger *trigger);
+extern int led_trigger_scale(struct led_classdev *led_cdev, unsigned int state);
 extern void led_trigger_remove(struct led_classdev *led_cdev);
 
 static inline void *led_get_trigger_data(struct led_classdev *led_cdev)

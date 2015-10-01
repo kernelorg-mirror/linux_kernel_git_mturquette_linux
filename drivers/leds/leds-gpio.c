@@ -22,6 +22,9 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
+
 struct gpio_led_data {
 	struct led_classdev cdev;
 	struct gpio_desc *gpiod;
@@ -183,6 +186,7 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 
 	device_for_each_child_node(dev, child) {
 		struct gpio_led led = {};
+		struct led_classdev *led_cdev;
 		const char *state = NULL;
 
 		led.gpiod = devm_get_gpiod_from_child(dev, NULL, child);
@@ -226,6 +230,14 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 			fwnode_handle_put(child);
 			goto err;
 		}
+
+		led_cdev = &priv->leds[priv->num_leds].cdev;
+		led_cdev->dev->of_node = np;
+
+		pm_runtime_irq_safe(led_cdev->dev);
+		pm_runtime_scale_allow(led_cdev->dev);
+		dev_pm_domain_attach(led_cdev->dev, true);
+
 		priv->num_leds++;
 	}
 

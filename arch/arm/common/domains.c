@@ -17,6 +17,7 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
+#include <linux/pm_opp.h>
 
 #include <asm/arm-pd.h>
 
@@ -143,6 +144,10 @@ static int __init arm_domain_cpu_init(void)
 				__func__, ret);
 			pm_runtime_disable(cpu_dev);
 		}
+
+		ret = opp_scale_register(cpu_dev, NULL, NULL);
+		if (ret)
+			dev_warn(cpu_dev, "Could not register opps\n");
 	}
 
 	return 0;
@@ -156,10 +161,18 @@ int arm_pd_get_next_state(struct generic_pm_domain *genpd,
 }
 
 int arm_pd_set_state(struct generic_pm_domain *genpd,
-				unsigned int state)
+				unsigned int pstate)
 {
+	int ret;
+	struct device *cpu_dev;
 
-	return 0;
+	cpu_dev = get_cpu_device(0);
+
+	ret = opp_scale(cpu_dev, pstate);
+	if (ret)
+		dev_warn(cpu_dev, "Could not scale opp\n");
+
+	return ret;
 }
 
 static int __init arm_domain_init(void)

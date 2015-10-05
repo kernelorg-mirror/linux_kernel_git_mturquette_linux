@@ -159,6 +159,10 @@ struct mtk_pll_data {
 	const struct mtk_pll_div_table *div_table;
 };
 
+/* Export for CPU DVFS coordinated clock rates */
+int mtk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+		unsigned long parent_rate);
+
 void __init mtk_clk_register_plls(struct device_node *node,
 		const struct mtk_pll_data *plls, int num_plls,
 		struct clk_onecell_data *clk_data);

@@ -167,6 +167,10 @@ void __init mtk_clk_register_plls(struct device_node *node,
 		const struct mtk_pll_data *plls, int num_plls,
 		struct clk_onecell_data *clk_data);
 
+int __init mtk_clk_register_muxes(struct device_node *node,
+			const struct mtk_composite *clks, int num,
+			struct clk_onecell_data *clk_data);
+
 #ifdef CONFIG_RESET_CONTROLLER
 void mtk_register_reset_controller(struct device_node *np,
 			unsigned int num_regs, int regofs);

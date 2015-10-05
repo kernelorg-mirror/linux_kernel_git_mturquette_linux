@@ -47,8 +47,21 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
 	return val;
 }
 
+int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+{
+	struct mtk_clk_mux *mux = to_clk_mux(hw);
+	u32 mask, val;
+
+	val = index << mux->shift;
+	mask = mux->mask << mux->shift;
+
+	return regmap_update_bits(mux->regmap, mux->reg, mask, val);
+}
+
 static const struct clk_ops cpu_dvfs_mux_ops = {
 	.get_parent = clk_mux_get_parent,
+	.select_coord_rates = generic_select_coord_rates,
+	.coordinate_rates = cpu_dvfs_coordinate_rates,
 };
 
 static struct clk __init *mtk_clk_register_mux(const struct mtk_composite *data,
@@ -74,6 +87,11 @@ static struct clk __init *mtk_clk_register_mux(const struct mtk_composite *data,
 	mux->mask = BIT(data->mux_width) - 1;
 	mux->regmap = regmap;
 	mux->hw.init = &init;
+	mux->hw.cr_domain = data->crd;
+	*(int *)&(mux->hw.cr_clk_index) = CPU_DVFS_MUX_INDEX;
+
+	for (i = 0; i < mux->hw.cr_domain->nr_rates; i++)
+		mux->hw.cr_domain->table[CPU_DVFS_MUX_INDEX][i].hw = &mux->hw;
 
 	clk = clk_register(NULL, &mux->hw);
 	if (IS_ERR(clk))

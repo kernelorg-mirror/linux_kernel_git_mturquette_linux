@@ -279,6 +279,15 @@ static const struct clk_ops mtk_pll_ops = {
 	.set_rate	= mtk_pll_set_rate,
 };
 
+static const struct clk_ops cpu_dvfs_pll_ops = {
+	.is_prepared	= mtk_pll_is_prepared,
+	.prepare	= mtk_pll_prepare,
+	.unprepare	= mtk_pll_unprepare,
+	.recalc_rate	= mtk_pll_recalc_rate,
+	.select_coord_rates = generic_select_coord_rates,
+	.coordinate_rates = cpu_dvfs_coordinate_rates,
+};
+
 static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
 		void __iomem *base)
 {
@@ -304,6 +313,23 @@ static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
 	init.ops = &mtk_pll_ops;
 	init.parent_names = &parent_name;
 	init.num_parents = 1;
+
+	/* setup CPU DVFS coordinated PLL information */
+	if (data->crd) {
+		int i;
+
+		pll->hw.cr_domain = data->crd;
+		*(int *)&(pll->hw.cr_clk_index) = CPU_DVFS_PLL_INDEX;
+
+		for (i = 0; i < pll->hw.cr_domain->nr_rates; i++) {
+			struct coord_rate_entry **tbl = pll->hw.cr_domain->table;
+
+			tbl[CPU_DVFS_PLL_INDEX][i].hw = &pll->hw;
+			tbl[CPU_DVFS_MUX_INDEX][i].parent_hw = &pll->hw;
+		}
+
+		init.ops = &cpu_dvfs_pll_ops;
+	}
 
 	clk = clk_register(NULL, &pll->hw);
 

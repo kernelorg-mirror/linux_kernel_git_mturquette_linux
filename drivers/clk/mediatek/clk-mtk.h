@@ -24,6 +24,7 @@ struct clk;
 #define MAX_MUX_GATE_BIT	31
 #define INVALID_MUX_GATE_BIT	(MAX_MUX_GATE_BIT + 1)
 
+#define KHZ (1000)
 #define MHZ (1000 * 1000)
 
 struct mtk_fixed_factor {
@@ -64,6 +65,8 @@ struct mtk_composite {
 	signed char divider_width;
 
 	signed char num_parents;
+
+	struct coord_rate_domain *crd;
 };
 
 #define MUX_GATE(_id, _name, _parents, _reg, _shift, _width, _gate) {	\
@@ -78,6 +81,7 @@ struct mtk_composite {
 		.parent_names = _parents,				\
 		.num_parents = ARRAY_SIZE(_parents),			\
 		.flags = CLK_SET_RATE_PARENT,				\
+		.crd = NULL,						\
 	}
 
 #define MUX(_id, _name, _parents, _reg, _shift, _width) {		\
@@ -91,6 +95,7 @@ struct mtk_composite {
 		.parent_names = _parents,				\
 		.num_parents = ARRAY_SIZE(_parents),			\
 		.flags = CLK_SET_RATE_PARENT,				\
+		.crd = NULL,						\
 	}
 
 #define DIV_GATE(_id, _name, _parent, _gate_reg, _gate_shift, _div_reg, _div_width, _div_shift) {	\
@@ -104,6 +109,21 @@ struct mtk_composite {
 		.gate_shift = _gate_shift,				\
 		.mux_shift = -1,					\
 		.flags = 0,						\
+		.crd = NULL,						\
+	}
+
+#define MUX_CR(_id, _name, _parents, _reg, _shift, _width, _crd) {		\
+		.id = _id,						\
+		.name = _name,						\
+		.mux_reg = _reg,					\
+		.mux_shift = _shift,					\
+		.mux_width = _width,					\
+		.gate_shift = -1,					\
+		.divider_shift = -1,					\
+		.parent_names = _parents,				\
+		.num_parents = ARRAY_SIZE(_parents),			\
+		.flags = 0,						\
+		.crd = _crd,						\
 	}
 
 struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
@@ -157,6 +177,7 @@ struct mtk_pll_data {
 	uint32_t pcw_reg;
 	int pcw_shift;
 	const struct mtk_pll_div_table *div_table;
+	struct coord_rate_domain *crd;
 };
 
 /* Export for CPU DVFS coordinated clock rates */
@@ -167,9 +188,22 @@ void __init mtk_clk_register_plls(struct device_node *node,
 		const struct mtk_pll_data *plls, int num_plls,
 		struct clk_onecell_data *clk_data);
 
+int clk_mux_set_parent(struct clk_hw *hw, u8 index);
+
 int __init mtk_clk_register_muxes(struct device_node *node,
 			const struct mtk_composite *clks, int num,
 			struct clk_onecell_data *clk_data);
+
+/* CPU DVFS coordinated clocks */
+#define NR_CPU_DVFS_CLKS	2
+#define CPU_DVFS_PLL_INDEX	0
+#define CPU_DVFS_MUX_INDEX	1
+
+int cpu_dvfs_coordinate_rates(const struct coord_rate_domain *crd,
+			      int rate_idx);
+
+void mtk_cpu_dvfs_domain_release(struct coord_rate_domain *domain);
+int mtk_cpu_dvfs_domain_init(struct coord_rate_domain *domain, int cpu);
 
 #ifdef CONFIG_RESET_CONTROLLER
 void mtk_register_reset_controller(struct device_node *np,

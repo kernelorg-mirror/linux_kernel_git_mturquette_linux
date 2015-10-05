@@ -15,8 +15,10 @@
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/mfd/syscon.h>
+#include <linux/cpufreq-dt.h>
 
 #include "clk-mtk.h"
 #include "clk-gate.h"
@@ -518,6 +520,90 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
 	"apll2_div5"
 };
 
+static const char * const ca53_parents[] __initconst = {
+	"clk26m",
+	"armca7pll",
+	"mainpll",
+	"univpll"
+};
+
+static const char * const ca57_parents[] __initconst = {
+	"clk26m",
+	"armca15pll",
+	"mainpll",
+	"univpll"
+};
+
+static struct coord_rate_entry *big_cpu_dvfs_table[] = {
+	[CPU_DVFS_PLL_INDEX] = (struct coord_rate_entry []){
+		{ .rate = 507000000, .parent_rate = 26000000, },
+		{ .rate = 702000000, .parent_rate = 26000000, },
+		{ .rate = 1001000000, .parent_rate = 26000000, },
+		{ .rate = 1209000000, .parent_rate = 26000000, },
+		{ .rate = 1404000000, .parent_rate = 26000000, },
+		{ .rate = 1612000000, .parent_rate = 26000000, },
+		{ .rate = 1807000000, .parent_rate = 26000000, },
+		{ .rate = 1989000000, .parent_rate = 26000000, },
+	},
+	[CPU_DVFS_MUX_INDEX] = (struct coord_rate_entry []){
+		{ .rate = 507000000,	.parent_rate = 507000000, },
+		{ .rate = 702000000,	.parent_rate = 702000000, },
+		{ .rate = 1001000000,	.parent_rate = 1001000000, },
+		{ .rate = 1209000000,	.parent_rate = 1209000000, },
+		{ .rate = 1404000000,	.parent_rate = 1404000000, },
+		{ .rate = 1612000000,	.parent_rate = 1612000000, },
+		{ .rate = 1807000000,	.parent_rate = 1807000000, },
+		{ .rate = 1989000000,	.parent_rate = 1989000000, },
+	},
+};
+
+static struct coord_rate_entry *little_cpu_dvfs_table[] = {
+	[CPU_DVFS_PLL_INDEX] = (struct coord_rate_entry []){
+		{ .rate = 507000000, .parent_rate = 26000000, },
+		{ .rate = 702000000, .parent_rate = 26000000, },
+		{ .rate = 1001000000, .parent_rate = 26000000, },
+		{ .rate = 1105000000, .parent_rate = 26000000, },
+		{ .rate = 1183000000, .parent_rate = 26000000, },
+		{ .rate = 1404000000, .parent_rate = 26000000, },
+		{ .rate = 1508000000, .parent_rate = 26000000, },
+		{ .rate = 1573000000, .parent_rate = 26000000, },
+	},
+	[CPU_DVFS_MUX_INDEX] = (struct coord_rate_entry []){
+		{ .rate = 507000000,	.parent_rate = 507000000, },
+		{ .rate = 702000000,	.parent_rate = 702000000, },
+		{ .rate = 1001000000,	.parent_rate = 1001000000, },
+		{ .rate = 1105000000,	.parent_rate = 1105000000, },
+		{ .rate = 1183000000,	.parent_rate = 1183000000, },
+		{ .rate = 1404000000,	.parent_rate = 1404000000, },
+		{ .rate = 1508000000,	.parent_rate = 1508000000, },
+		{ .rate = 1573000000,	.parent_rate = 1573000000, },
+	},
+};
+
+#define NR_CLUSTERS	2
+#define LITTLE_CLUSTER	0
+#define BIG_CLUSTER	1
+
+static struct coord_rate_domain cpu_dvfs_domain[] ={
+	[LITTLE_CLUSTER] = {
+		.nr_clks = NR_CPU_DVFS_CLKS,
+		.nr_rates = 8,
+		.table = little_cpu_dvfs_table,
+	},
+	[BIG_CLUSTER] = {
+		.nr_clks = NR_CPU_DVFS_CLKS,
+		.nr_rates = 8,
+		.table = big_cpu_dvfs_table,
+	}
+};
+
+static const struct mtk_composite infra_muxes[] __initconst = {
+	MUX_CR(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2,
+			&cpu_dvfs_domain[LITTLE_CLUSTER]),
+	MUX_CR(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2,
+			&cpu_dvfs_domain[BIG_CLUSTER]),
+};
+
 static const struct mtk_composite top_muxes[] __initconst = {
 	/* CLK_CFG_0 */
 	MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
@@ -755,6 +841,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
 	mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
 						clk_data);
 
+	mtk_clk_register_muxes(node, infra_muxes, ARRAY_SIZE(infra_muxes),
+						clk_data);
+
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 	if (r)
 		pr_err("%s(): could not register clock provider: %d\n",
@@ -855,8 +944,8 @@ static const struct mtk_pll_div_table mmpll_div_table[] = {
 };
 
 static const struct mtk_pll_data plls[] = {
-	PLL(CLK_APMIXED_ARMCA15PLL, "armca15pll", 0x200, 0x20c, 0x00000001, 0, 21, 0x204, 24, 0x0, 0x204, 0),
-	PLL(CLK_APMIXED_ARMCA7PLL, "armca7pll", 0x210, 0x21c, 0x00000001, 0, 21, 0x214, 24, 0x0, 0x214, 0),
+	PLL_CR(CLK_APMIXED_ARMCA7PLL, "armca7pll", 0x210, 0x21c, 0x00000001, 0, 21, 0x214, 24, 0x0, 0x214, 0, &cpu_dvfs_domain[LITTLE_CLUSTER]),
+	PLL_CR(CLK_APMIXED_ARMCA15PLL, "armca15pll", 0x200, 0x20c, 0x00000001, 0, 21, 0x204, 24, 0x0, 0x204, 0, &cpu_dvfs_domain[BIG_CLUSTER]),
 	PLL(CLK_APMIXED_MAINPLL, "mainpll", 0x220, 0x22c, 0xf0000101, HAVE_RST_BAR, 21, 0x220, 4, 0x0, 0x224, 0),
 	PLL(CLK_APMIXED_UNIVPLL, "univpll", 0x230, 0x23c, 0xfe000001, HAVE_RST_BAR, 7, 0x230, 4, 0x0, 0x234, 14),
 	PLL_B(CLK_APMIXED_MMPLL, "mmpll", 0x240, 0x24c, 0x00000001, 0, 21, 0x244, 24, 0x0, 0x244, 0, mmpll_div_table),
@@ -885,3 +974,51 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
 }
 CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8173-apmixedsys",
 		mtk_apmixedsys_init);
+
+static struct cpufreq_cpu_domain cpufreq_domain[NR_CLUSTERS];
+
+struct cpufreq_dt_platform_data cpufreq_dt_pd = {
+	.independent_clocks = 1,
+	.domain_list = LIST_HEAD_INIT(cpufreq_dt_pd.domain_list),
+};
+
+static int mt8173_cpu_dvfs_init(void)
+{
+	int ret;
+
+	if (!of_machine_is_compatible("mediatek,mt8173"))
+		return -ENODEV;
+
+	/* initialize cpu dvfs domain for little cluster */
+	ret = mtk_cpu_dvfs_domain_init(&cpu_dvfs_domain[0], 0);
+	if (ret) {
+		pr_err("failed to initialize cpu dvfs domain for cpu0\n");
+		return ret;
+	}
+
+	/* initialize cpu dvfs domain for big cluster */
+	ret = mtk_cpu_dvfs_domain_init(&cpu_dvfs_domain[1], 2);
+	if (ret) {
+		pr_err("failed to initialize cpu dvfs domain for cpu2\n");
+		mtk_cpu_dvfs_domain_release(&cpu_dvfs_domain[0]);
+		return ret;
+	}
+
+	/* setup domain cpumask for little cluster */
+	cpumask_copy(&cpufreq_domain[LITTLE_CLUSTER].cpus,
+			&cpu_topology[0].core_sibling);
+	list_add(&cpufreq_domain[LITTLE_CLUSTER].node,
+			&cpufreq_dt_pd.domain_list);
+
+	/* setup domain cpumask for big cluster */
+	cpumask_copy(&cpufreq_domain[BIG_CLUSTER].cpus,
+			&cpu_topology[2].core_sibling);
+	list_add(&cpufreq_domain[BIG_CLUSTER].node,
+			&cpufreq_dt_pd.domain_list);
+
+	platform_device_register_data(NULL, "cpufreq-dt", -1, &cpufreq_dt_pd,
+				      sizeof(cpufreq_dt_pd));
+
+	return 0;
+}
+device_initcall(mt8173_cpu_dvfs_init);
